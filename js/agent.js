@@ -155,15 +155,104 @@ Agent.prototype.selectMove = function (gameManager) {
     // ----------------------------
 
     // 0 = left, 1 = down, 2 = right,
+    var moves = 4;
+    var depth = 4;
+    var expectedValues = [];
 
+    for (var i = 0; i < moves; i++) {
+        var moved = brain.move(i);
+
+        if (moved) {
+            expectedValues.push(this.expectiMiniMax(brain, depth - 1, false));
+            brain.reset();
+        }
+        else {
+            expectedValues.push(-1111111111);
+        }
+    }
+
+    return findIndexOfMaxValue(expectedValues);
+};
+
+Agent.prototype.expectiMiniMax = function(brain, depth, isPlayer) {
+    if (depth == 0 || !brain.grid.cellsAvailable()) {
+        return brain.score;
+    }
+
+    var previousScore = brain.score;
+    var previousState = brain.grid.serialize();
+
+    if (isPlayer) {
+        var maxValue = -1111111111;
+        var moved = false;
+
+        for (var i = 0; i < 4; i++) {
+            moved = brain.move(i);
+
+            if (moved) {
+                var value = this.expectiMiniMax(brain, depth - 1, !isPlayer);
+                console.log(value);
+                maxValue = Math.max(value, maxValue);
+                brain.grid = new Grid(previousState.size, previousState.cells);
+                brain.score = previousScore;
+            }
+        }
+
+        return maxValue;
+    } else {
+        var expectedValue = 0;
+        var cells = brain.grid.availableCells();
+        var size = cells.length;
+
+        for (var i = 0; i < size; i++) {
+            brain.grid.insertTile(new Tile(cells[i], 2));
+            expectedValue += (1.0 / size) * 0.9 * this.expectiMiniMax(brain, depth - 1, !isPlayer);
+            brain.grid = new Grid(previousState.size, previousState.cells);
+            brain.score = previousScore;
+        }
+
+        return expectedValue;
+    }
 
 };
 
-Agent.prototype.expectiMiniMax() {
-
-};
-
-Agent.prototype.evaluateGrid = function (gameManager) {
+Agent.prototype.evaluateGrid = function (gameBoard) {
     // calculate a score for the current grid configuration
 
+    //NURSULTAN
+    var cells = gameBoard.cells;
+    var tilesNum = 0;
+    var maxTile = 0;
+    var maxTileX = undefined;
+    var maxTileY = undefined;
+    var tile = null;
+
+    for (var row = 0; row < 4; row++) {
+        // var
+
+        for (var col = 0; col <4; col++) {
+                tile = cells[row][col];
+
+                if (tile != null) {
+                    tilesNum++;
+
+                }
+            }
+        }
+    // }
 };
+
+// HELPER METHODS
+function findIndexOfMaxValue(array) {
+    var maxValue = array[0];
+    var index = 0;
+
+    for (var i = 1; i < array.length; i++) {
+        if (maxValue < array[i]) {
+            maxValue = array[i];
+            index = i;
+        }
+    }
+
+    return index;
+}
