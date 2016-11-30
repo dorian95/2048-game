@@ -81,9 +81,9 @@ AgentBrain.prototype.move = function (direction) {
         });
     });
     //console.log(moved);
-    if (moved) {
-        this.addRandomTile();
-    }
+    //if (moved) {
+      //  this.addRandomTile();
+    //}
     return moved;
 };
 
@@ -158,9 +158,9 @@ Agent.prototype.selectMove = function (gameManager) {
     var moves = 4;
     var depth = 4;
     var expectedValues = [];
-
+    var moved = false;
     for (var i = 0; i < moves; i++) {
-        var moved = brain.move(i);
+        moved = brain.move(i);
 
         if (moved) {
             expectedValues.push(this.expectiMiniMax(brain, depth - 1, false));
@@ -176,7 +176,8 @@ Agent.prototype.selectMove = function (gameManager) {
 
 Agent.prototype.expectiMiniMax = function(brain, depth, isPlayer) {
     if (depth == 0 || !brain.grid.cellsAvailable()) {
-        return brain.score;
+        //return brain.score;
+        return this.evaluateGrid(brain.grid);
     }
 
     var previousScore = brain.score;
@@ -191,7 +192,7 @@ Agent.prototype.expectiMiniMax = function(brain, depth, isPlayer) {
 
             if (moved) {
                 var value = this.expectiMiniMax(brain, depth - 1, !isPlayer);
-                console.log(value);
+               // console.log(value);
                 maxValue = Math.max(value, maxValue);
                 brain.grid = new Grid(previousState.size, previousState.cells);
                 brain.score = previousScore;
@@ -206,7 +207,7 @@ Agent.prototype.expectiMiniMax = function(brain, depth, isPlayer) {
 
         for (var i = 0; i < size; i++) {
             brain.grid.insertTile(new Tile(cells[i], 2));
-            expectedValue += (1.0 / size) * 0.9 * this.expectiMiniMax(brain, depth - 1, !isPlayer);
+            expectedValue += (1.0 / (size)) * 0.9 * this.expectiMiniMax(brain, depth - 1, !isPlayer);
             brain.grid = new Grid(previousState.size, previousState.cells);
             brain.score = previousScore;
         }
@@ -221,28 +222,147 @@ Agent.prototype.evaluateGrid = function (gameBoard) {
 
     //NURSULTAN
     var cells = gameBoard.cells;
-    var tilesNum = 0;
-    var maxTile = 0;
-    var maxTileX = undefined;
-    var maxTileY = undefined;
-    var tile = null;
+    var tileCount = 0;
+    var rowTiles = [];
+    var colTiles = [];
+    var maxTileValue = 0;
+    var monotonicity = 0;
+    var cell = null;
+    var weightMatrix = [
+       [0.135759, 0.121925, 0.102812, 0.099937],
+       [0.0997992, 0.0888405, 0.076711, 0.0724143],
+       [0.060654, 0.0562579, 0.037116, 0.0161889],
+       [0.0125498, 0.00992495, 0.00575871, 0.00335193]
+    ];
+
+    var valueMatrix = [
+        [0, 0, 0, 0], 
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0]
+    ];
+    var totalScore = 0;
 
     for (var row = 0; row < 4; row++) {
-        // var
+        cell = cells[row][col];
+        for (var col = 0; col < 4; col++) {
+            if (cell == null) {
+                //  cell.value = 0;
+                valueMatrix[row][col] = 0 * weightMatrix[row][col];
+                totalScore += valueMatrix[row][col];
+            }
+            else {
+    
+                //tileCount++;
+                //rowTiles.push(cell.value);
 
-        for (var col = 0; col <4; col++) {
-                tile = cells[row][col];
+            valueMatrix[row][col] =  cell.value * weightMatrix[row][col];
+            totalScore += valueMatrix[row][col];
+            //  if (cell.value > maxTileValue) {
+            //    maxTileValue = cell.value;
+            //  maxX = cell.x;
+            //maxY = cell.y;
+            //}
 
-                if (tile != null) {
-                    tilesNum++;
-
-                }
             }
         }
-    // }
+    }
+    return totalScore;
 };
 
 // HELPER METHODS
+
+function weightMatrix() {
+    var weightMatrix = [
+        [0.135759, 0.121925, 0.102812, 0.099937],
+        [0.0997992, 0.0888405, 0.076711, 0.0724143],
+        [0.060654, 0.0562579, 0.037116, 0.0161889],
+        [0.0125498, 0.00992495, 0.00575871, 0.00335193]
+    ];
+
+}
+function findTiles(gameBoard) {
+
+    var cells = gameBoard.cells;
+    var tileCount = 0;
+    var rowTiles = [];
+    var colTiles = [];
+    var maxTileValue = 0;
+    var monotonicity = 0;
+
+    for (var row = 0; row < 4; row++) {
+        cell = cells[row][col];
+        for (var col = 0; col < 3; col++ ) {
+                if (cell != null) {
+                   tileCount++;
+                   rowTiles.push(cell.value);
+
+                    if (cell.value > maxTileValue) {
+                        maxTileValue = cell.value;
+                        maxX = cell.x;
+                        maxY = cell.y;
+                    }
+                }
+            }
+    }
+
+    for (var col = 0; col < 4; col++) {
+
+        for (var row = 0; row < 4; row++) {
+            cell = cells[row][col];
+
+            if (cell != null) {
+                colTiles.push(cell.value);
+            }
+        }
+    }
+
+}
+
+
+function rowMonotonicity(gameBoard) {
+
+    //var cells = gameBoard.cells;
+    var cell = null;
+    var rowMonotonicity = 0;
+    var neighbor = null;
+    for (var row = 0; row < 4; row++) {
+        cell = cells[row][col];
+        neighbor = cells[row + 1][col];
+        for (var col = 0; col < 3; col++ ) {
+            if (cell != null && neighbor != null) {
+                if (cell[row][col] <= cell[row][col + 1]) {
+                    rowMonotonicity++;
+                }
+            }
+        }
+    }
+    return rowMonotonicity;
+}
+
+function colMonotonicity(gameBoard) {
+
+   // var cells = gameBoard.cells;
+    var cell = null;
+    var rowTile = null;
+    var colMonotonicity = 0;
+
+    for (var col = 0; col < 4; col++) {
+        cell = cells[row][col];
+        for (var row = 0; row < 3; row++) {
+            if (cell != null) {
+
+                rowTile = cell;
+                if (cell[row][col] <= cell[row + 1][col]) {
+                    colMonotonicity++;
+                }
+            }
+            
+        }
+    }
+
+    return colMonotonicity;
+}
 function findIndexOfMaxValue(array) {
     var maxValue = array[0];
     var index = 0;
