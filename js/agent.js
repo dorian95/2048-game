@@ -80,10 +80,11 @@ AgentBrain.prototype.move = function (direction) {
             }
         });
     });
+
     //console.log(moved);
-    if (moved) {
-        this.addRandomTile();
-    }
+    // if (moved) {
+    //     this.addRandomTile();
+    // }
     return moved;
 };
 
@@ -147,66 +148,76 @@ Agent.prototype.selectMove = function (gameManager) {
     // i = 0: up, 1: right, 2: down, 3: left
     // brain.reset() resets the brain to the current game board
 
-    // Teacher's code
-    // if (brain.move(0)) return 0;
-    // if (brain.move(1)) return 1;
-    // if (brain.move(3)) return 3;
-    // if (brain.move(2)) return 2;
-    // ----------------------------
 
-    // 0 = left, 1 = down, 2 = right,
+    // this.evaluateGrid(brain.grid);
+
+
+    // 0: left, 1: down, 2: right, 3: top
     var moves = 4;
-    var depth = 4;
+    var depth = 1;      // search depth boundary
     var expectedValues = [];
+
 
     for (var i = 0; i < moves; i++) {
         var moved = brain.move(i);
 
         if (moved) {
-            expectedValues.push(this.expectiMiniMax(brain, depth - 1, false));
+            expectedValues.push(this.expectiMiniMax(brain, depth - 1, true));
             brain.reset();
         }
         else {
-            expectedValues.push(-1111111111);
+            expectedValues.push(-999999999);
         }
     }
 
     return findIndexOfMaxValue(expectedValues);
 };
 
-Agent.prototype.expectiMiniMax = function(brain, depth, isPlayer) {
+
+Agent.prototype.expectiMiniMax = function(brain, depth, PLAYER) {
     if (depth == 0 || !brain.grid.cellsAvailable()) {
-        return brain.score;
+        return this.evaluateGrid(brain.grid);
     }
 
     var previousScore = brain.score;
     var previousState = brain.grid.serialize();
 
-    if (isPlayer) {
-        var maxValue = -1111111111;
-        var moved = false;
+    // Max Node. Player chooses a move out of 4 possible moves.
+    if (PLAYER) {
+        var maxValue    = -999999999;
+        var moved       = false;
 
         for (var i = 0; i < 4; i++) {
             moved = brain.move(i);
 
             if (moved) {
-                var value = this.expectiMiniMax(brain, depth - 1, !isPlayer);
-                console.log(value);
+                var value = this.expectiMiniMax(brain, depth - 1, !PLAYER);
+                // console.log(value);
                 maxValue = Math.max(value, maxValue);
                 brain.grid = new Grid(previousState.size, previousState.cells);
+                // may be use brain.reset()
                 brain.score = previousScore;
             }
         }
 
         return maxValue;
+
+    // Chance Node. Board inserts random tile.
     } else {
         var expectedValue = 0;
-        var cells = brain.grid.availableCells();
-        var size = cells.length;
+        var cells   = brain.grid.availableCells();
+        var size    = cells.length;
 
         for (var i = 0; i < size; i++) {
             brain.grid.insertTile(new Tile(cells[i], 2));
-            expectedValue += (1.0 / size) * 0.9 * this.expectiMiniMax(brain, depth - 1, !isPlayer);
+            expectedValue += (1.0 / size) * 0.9 * this.expectiMiniMax(brain, depth - 1, !PLAYER);
+            brain.grid = new Grid(previousState.size, previousState.cells);
+            brain.score = previousScore;
+        }
+
+        for (var i = 0; i < size; i++) {
+            brain.grid.insertTile(new Tile(cells[i], 4));
+            expectedValue += (1.0 / size) * 0.1 * this.expectiMiniMax(brain, depth - 1, !PLAYER);
             brain.grid = new Grid(previousState.size, previousState.cells);
             brain.score = previousScore;
         }
@@ -219,28 +230,94 @@ Agent.prototype.expectiMiniMax = function(brain, depth, isPlayer) {
 Agent.prototype.evaluateGrid = function (gameBoard) {
     // calculate a score for the current grid configuration
 
-    //NURSULTAN
-    var cells = gameBoard.cells;
-    var tilesNum = 0;
-    var maxTile = 0;
-    var maxTileX = undefined;
-    var maxTileY = undefined;
-    var tile = null;
+    var cells   = gameBoard.cells;  // copy of the board cells
+    // var penalty = 0;
+    var score1  = 0,
+        score2  = 0,
+        score3  = 0,
+        score4  = 0;                // total score
 
+
+    // matrix with weights to calculate score
+    var weigthhMatrix1 = [
+        [10000, 5000, 250, 0],
+        [5000, 250, 0, -25],
+        [250, 0, -25,-50],
+        [0,-25,-50,-100]
+    ];
+
+    // var weigthhMatrix1 = [
+    //     [6, 5, 4, 1],
+    //     [5, 4, 1, 0],
+    //     [4, 1, 0,-1],
+    //     [1, 0,-1,-2]
+    // ];
+
+
+    // var weigthhMatrix2 = [
+    //     [0, 25, 50,  100],
+    //     [-25, 0, 25,  50],
+    //     [-50, -25, 0, 25],
+    //     [-100,-50,-25, 0]
+    // ];
+    //
+    // var weigthhMatrix3 = [
+    //     [-100,-50,-25,0],
+    //     [-50, -25, 0,25],
+    //     [-25, 0, 25, 50],
+    //     [ 0, 25, 50,100]
+    // ];
+    //
+    // var weigthhMatrix4 = [
+    //     [0,-25,-50,-100],
+    //     [25, 0, -25,-50],
+    //     [50, 25, 0, -25],
+    //     [100, 50, 25, 0]
+    // ];
+
+    // score calculated based on weight matrix 1
     for (var row = 0; row < 4; row++) {
-        // var
-
-        for (var col = 0; col <4; col++) {
-                tile = cells[row][col];
-
-                if (tile != null) {
-                    tilesNum++;
-
-                }
-            }
+        for (var col = 0; col < 4; col++) {
+            var tileValue = (cells[row][col] != null) ? cells[row][col].value : 0;
+            score1 += tileValue * weigthhMatrix1[row][col];
         }
+    }
+
+
+
+    // score calculated based on weight matrix 2
+    // for (var row = 0; row < 4; row++) {
+    //     for (var col = 0; col < 4; col++) {
+    //         var tileValue = (cells[row][col] != null) ? cells[row][col].value : 0;
+    //         score2 += tileValue * weigthhMatrix2[row][col];
+    //     }
     // }
+    //
+    // // score calculated based on weight matrix 3
+    // for (var row = 0; row < 4; row++) {
+    //     for (var col = 0; col < 4; col++) {
+    //         var tileValue = (cells[row][col] != null) ? cells[row][col].value : 0;
+    //         score3 += tileValue * weigthhMatrix3[row][col];
+    //     }
+    // }
+    //
+    // // score calculated based on weight matrix 4
+    // for (var row = 0; row < 4; row++) {
+    //     for (var col = 0; col < 4; col++) {
+    //         var tileValue = (cells[row][col] != null) ? cells[row][col].value : 0;
+    //         score4 += tileValue * weigthhMatrix4[row][col];
+    //     }
+    // }
+
+    // return score;
+    // var s1 = Math.max(score1, score2);
+    // var s2 = Math.max(score3, score4);
+    // return Math.max(s1, s2);
+
+    return score1;
+
 };
+
 
 // HELPER METHODS
 function findIndexOfMaxValue(array) {
